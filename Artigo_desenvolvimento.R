@@ -313,19 +313,70 @@ DADOS <- dplyr::full_join(DADOS,LFT  ,by="ID")
 #-------------------------------------------------------------------------------
 DADOS <- DADOS|>
   dplyr::mutate(PROD = ((Sva+Iva)/(LFT*(EinS+EinI))))
-DADOS$AFFva <- NULL
-DADOS$Sva <- NULL
-DADOS$Iva <- NULL
-DADOS$EinA <- NULL
-DADOS$EinI <- NULL
-DADOS$EinS <- NULL
-DADOS$LFT <- NULL
+# removendo variaveis inrelevantes 
+DADOS <- DADOS |> dplyr::select(-AFFva,-Sva,-Iva,-EinA,-EinI,-EinS,-LFT)
+# removendo bases de dados:
+remove(AFFva,Sva,Iva,EinA,EinI,EinS,LFT,grgdp,inv,ms,pi,popgr)
 #-------------------------------------------------------------------------------
-# Juntando com a clssifica??o dos pa?ses:
+# Juntando com a clssificacao dos paises:
 #-------------------------------------------------------------------------------
 GRUPO <- readxl::read_excel("C:/BASE_DE_DADOS/INFLACAO/GRUPO.xlsx")
 GRUPO$`Country Name`<- NULL
-DADOS <- dplyr::full_join(DADOS,GRUPO  ,by="Country Code")
+DADOS <- dplyr::full_join(DADOS,GRUPO ,by="Country Code")
+remove(GRUPO)
+#-------------------------------------------------------------------------------
+# Juntando com os dados de qualidade do bacen: 
+#-------------------------------------------------------------------------------
+base_bacen <- haven::read_dta("base_bacen.dta")
+base_bacen <-  janitor::clean_names(base_bacen) |> as.data.frame()
+DADOS <-  janitor::clean_names(DADOS)
+# criando codigo para juntar as bases:
+base_bacen <- base_bacen |> dplyr::mutate(jun_ba=paste(wb_a3,"-",year))
+DADOS <- DADOS |> dplyr::mutate(jun_ba=paste(country_code,"-",ano))
+dplyr::glimpse(base_bacen)
+# juntando dados
+DADOS <- dplyr::right_join(DADOS,base_bacen,by="jun_ba")
+# removendo o desnecessario:
+remove(base_bacen)
+# removendo variaveis desnecessarias:
+DADOS <- DADOS |> dplyr::select(-id,)
+haven::write_dta( DADOS,  "DADOS.dta")
+dplyr::glimpse(DADOS)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # fazendo a taxa de crescimento:
 DADOS_R <- DADOS|> 
   subset(Ano>=1999 & Ano<=2019)|>
@@ -446,8 +497,8 @@ View(Estatis)
 str(DADOS1)
 
 library("plm")
-ols <- plm(log(PROD) ~ log(pi) +inv+popgr+ms,
-           DADOS1, model = "pooling",index=c("CODI", "Ano"))
+ols <- plm::plm(log(PROD) ~ log(pi) +inv+popgr+ms,
+           DADOS, model = "pooling",index=c("country_code", "ano"))
 between <- update(ols, model = "between")
 within <- update(ols, model = "within")
 walhus <- update(ols, model = "random", random.method = "walhus", random.dfcor = 3)
